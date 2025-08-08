@@ -1,0 +1,14 @@
+[global]
+   workgroup = WORKGROUP
+   server string = Samba Server
+   netbios name = samba
+   security = user
+   map to guest = Bad User
+   dns proxy = no
+
+{% for share, config in smb_conf_shares.items() %}
+[{{ share }}]
+{% for key, value in config.items() %}
+  {{ key.replace("_", " ") }} = {{ value }}
+{% endfor %}
+{% endfor %}

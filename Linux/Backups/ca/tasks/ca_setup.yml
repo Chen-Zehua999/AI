@@ -1,0 +1,38 @@
+---
+- name: Create CA directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ ca_base_dir }}"
+    - "{{ ca_base_dir }}/certs"
+    - "{{ ca_base_dir }}/crl"
+    - "{{ ca_base_dir }}/newcerts"
+    - "{{ ca_base_dir }}/private"
+    - "{{ grading_dir }}"
+
+- name: Set restrictive permissions on private directory
+  file:
+    path: "{{ ca_base_dir }}/private"
+    mode: '0700'
+
+- name: Create CA database files
+  copy:
+    content: ""
+    dest: "{{ ca_base_dir }}/index.txt"
+    force: no
+
+- name: Initialize serial numbers
+  copy:
+    content: "1000\n"
+    dest: "{{ item }}"
+    force: no
+  loop:
+    - "{{ ca_base_dir }}/serial"
+    - "{{ ca_base_dir }}/crlnumber"
+
+- name: Create OpenSSL configuration file
+  template:
+    src: openssl.cnf.j2
+    dest: /etc/ssl/openssl.cnf

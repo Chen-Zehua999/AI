@@ -1,0 +1,33 @@
+dn: cn=admin,dc=int,dc=worldskills,dc=org
+sn: Admin
+cn: Admin
+objectClass: top
+objectClass: person
+
+dn: cn=Jamie,ou=Employees,dc=int,dc=worldskills,dc=org
+uid: Jamie
+sn: Oliver
+cn: Jamie Oliver
+mail: Jamie.oliver@dmz.worldskills.org
+uidnumber: 10001
+gidnumber: 10001
+objectClass: top
+objectClass: posixaccount
+objectClass: inetorgperson
+userpassword: Skill39@Lyon
+loginshell: /bin/bash
+homedirectory: /home/Jamie
+
+dn: cn=peter,ou=Employees,dc=int,dc=worldskills,dc=org
+uid: peter
+sn: Fox
+cn: Peter Fox
+mail: peter.fox@dmz.worldskills.org
+uidnumber: 10002
+gidnumber: 10002
+objectClass: top
+objectClass: posixaccount
+objectClass: inetorgperson
+userpassword: Skill39@Lyon
+loginshell: /bin/bash
+homedirectory: /home/peter

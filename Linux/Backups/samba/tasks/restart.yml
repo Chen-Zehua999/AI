@@ -1,0 +1,6 @@
+---
+- name: Restart Samba service
+  systemd:
+    name: smbd
+    state: restarted
+    enabled: yes

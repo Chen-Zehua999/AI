@@ -1,0 +1,20 @@
+---
+samba_user: jamie
+samba_password: Skill39@Lyon
+
+smb_conf_shares:
+  public:
+    path: /public
+    browseable: yes
+    guest_ok: yes
+    read_only: yes
+    write_list: "@sambashare"
+    create_mask: "0664"
+    directory_mask: "0775"
+
+  internal:
+    path: /internal
+    browseable: yes
+    guest_ok: no
+    valid_users: "@sambashare"
+    writeable: yes

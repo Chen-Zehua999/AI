@@ -1,0 +1,5 @@
+---
+- import_tasks: ca_setup.yml
+- import_tasks: generate_keys.yml
+- import_tasks: sign_certs.yml
+- import_tasks: copy_certs.yml

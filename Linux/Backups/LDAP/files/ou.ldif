@@ -1,0 +1,3 @@
+dn: ou=Employees,dc=int,dc=worldskills,dc=org
+objectClass: organizationalUnit
+ou: Employees

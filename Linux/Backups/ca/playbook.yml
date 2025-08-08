@@ -1,0 +1,5 @@
+---
+- name: Setup OpenSSL CA with Role
+  hosts: int-srv01
+  roles:
+    - openssl_ca

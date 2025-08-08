@@ -1,0 +1,33 @@
+- name: Install Squid
+  apt:
+    name: squid
+    state: present
+    update_cache: yes
+
+- name: Deploy squid.conf
+  copy:
+    src: squid.conf
+    dest: /etc/squid/squid.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart Squid
+  systemd:
+    name: squid
+    state: restarted
+    enabled: yes
+
+- name: Deploy nftables.conf
+  copy:
+    src: nftables.conf
+    dest: /etc/nftables.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart nftables
+  systemd:
+    name: nftables
+    state: restarted
+    enabled: yes

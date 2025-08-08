@@ -1,0 +1,35 @@
+- name: Install LDAP packages
+  apt:
+    name:
+      - slapd
+      - ldap-utils
+    state: present
+    update_cache: yes
+
+- name: Copy ou.ldif to server
+  copy:
+    src: ou.ldif
+    dest: /etc/ldap/ou.ldif
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy user.ldif to server
+  copy:
+    src: user.ldif
+    dest: /etc/ldap/user.ldif
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add organizational unit
+  command: ldapadd -D cn=admin,dc=int,dc=worldskills,dc=org -x -w Skill39@Lyon -f /etc/ldap/ou.ldif
+  register: ou_add
+  changed_when: "'successfully' in ou_add.stdout or 'adding new entry' in ou_add.stdout"
+  failed_when: "'error' in ou_add.stderr"
+
+- name: Add users
+  command: ldapadd -D cn=admin,dc=int,dc=worldskills,dc=org -x -w Skill39@Lyon -f /etc/ldap/user.ldif
+  register: user_add
+  changed_when: "'successfully' in user_add.stdout or 'adding new entry' in user_add.stdout"
+  failed_when: "'error' in user_add.stderr"

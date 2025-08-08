@@ -1,0 +1,51 @@
+---
+- name: Generate Root CA private key
+  command: openssl genrsa -out {{ ca_base_dir }}/private/ca.key 2048
+  args:
+    creates: "{{ ca_base_dir }}/private/ca.key"
+
+- name: Set permissions on Root CA private key
+  file:
+    path: "{{ ca_base_dir }}/private/ca.key"
+    mode: '0600'
+
+- name: Generate Root CA certificate
+  command: >
+    openssl req -new -x509 -days 3650 
+    -config /etc/ssl/openssl.cnf 
+    -extensions v3_ca 
+    -key {{ ca_base_dir }}/private/ca.key 
+    -out {{ ca_base_dir }}/certs/ca.crt
+    -subj "/C=FR/O=ClearSky/CN=ClearSky Root CA"
+  args:
+    creates: "{{ ca_base_dir }}/certs/ca.crt"
+
+- name: Generate Certificate Revocation List (PEM)
+  command: >
+    openssl ca -gencrl 
+    -config /etc/ssl/openssl.cnf 
+    -cert {{ ca_base_dir }}/certs/ca.crt 
+    -keyfile {{ ca_base_dir }}/private/ca.key 
+    -out {{ ca_base_dir }}/crl/ca.crl.pem
+  args:
+    creates: "{{ ca_base_dir }}/crl/ca.crl.pem"
+
+- name: Convert CRL to DER format
+  command: >
+    openssl crl 
+    -inform PEM 
+    -in {{ ca_base_dir }}/crl/ca.crl.pem 
+    -out {{ ca_base_dir }}/crl/ca.crl 
+    -outform DER
+  args:
+    creates: "{{ ca_base_dir }}/crl/ca.crl"
+
+- name: Generate Sub CA private key
+  command: openssl genrsa -out {{ ca_base_dir }}/private/subca.key 2048
+  args:
+    creates: "{{ ca_base_dir }}/private/subca.key"
+
+- name: Set permissions on Sub CA private key
+  file:
+    path: "{{ ca_base_dir }}/private/subca.key"
+    mode: '0600'

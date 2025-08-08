@@ -1,0 +1,250 @@
+---
+- name: Setup OpenSSL Certificate Authority
+  hosts: int-srv01
+  
+  vars:
+    ca_base_dir: /etc/ssl/CA
+    grading_dir: /opt/grading/ca
+    
+  tasks:
+    - name: Create CA directory structure
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ ca_base_dir }}"
+        - "{{ ca_base_dir }}/certs"
+        - "{{ ca_base_dir }}/crl"
+        - "{{ ca_base_dir }}/newcerts"
+        - "{{ ca_base_dir }}/private"
+        - "{{ grading_dir }}"
+
+    - name: Set restrictive permissions on private directory
+      file:
+        path: "{{ ca_base_dir }}/private"
+        mode: '0700'
+
+    - name: Create CA database files
+      copy:
+        content: ""
+        dest: "{{ ca_base_dir }}/index.txt"
+        force: no
+
+    - name: Initialize serial numbers
+      copy:
+        content: "1000\n"
+        dest: "{{ item }}"
+        force: no
+      loop:
+        - "{{ ca_base_dir }}/serial"
+        - "{{ ca_base_dir }}/crlnumber"
+
+    - name: Create OpenSSL configuration file
+      copy:
+        dest: /etc/ssl/openssl.cnf
+        content: |
+          [ ca ]
+          default_ca = CA_default
+          
+          [ CA_default ]
+          dir               = {{ ca_base_dir }}
+          certs             = $dir/certs
+          crl_dir           = $dir/crl
+          new_certs_dir     = $dir/newcerts
+          database          = $dir/index.txt
+          serial            = $dir/serial
+          crlnumber         = $dir/crlnumber
+          
+          certificate       = $dir/certs/ca.crt
+          private_key       = $dir/private/ca.key
+          
+          default_days      = 365
+          default_crl_days  = 30
+          default_md        = sha256
+          preserve          = no
+          policy            = policy_anything
+          
+          [ policy_anything ]
+          countryName             = optional
+          stateOrProvinceName     = optional
+          organizationName        = optional
+          organizationalUnitName  = optional
+          commonName              = supplied
+          emailAddress            = optional
+          
+          [ v3_ca ]
+          subjectKeyIdentifier   = hash
+          authorityKeyIdentifier = keyid:always,issuer
+          basicConstraints       = critical,CA:true
+          keyUsage              = critical, digitalSignature, cRLSign, keyCertSign
+          
+          [ v3_intermediate_ca ]
+          subjectKeyIdentifier   = hash
+          authorityKeyIdentifier = keyid:always,issuer
+          basicConstraints       = critical,CA:true,pathlen:0
+          keyUsage              = critical, digitalSignature, cRLSign, keyCertSign
+
+    - name: Generate Root CA private key
+      command: openssl genrsa -out {{ ca_base_dir }}/private/ca.key 2048
+      args:
+        creates: "{{ ca_base_dir }}/private/ca.key"
+
+    - name: Set permissions on Root CA private key
+      file:
+        path: "{{ ca_base_dir }}/private/ca.key"
+        mode: '0600'
+
+    - name: Generate Root CA certificate
+      command: >
+        openssl req -new -x509 -days 3650 
+        -config /etc/ssl/openssl.cnf 
+        -extensions v3_ca 
+        -key {{ ca_base_dir }}/private/ca.key 
+        -out {{ ca_base_dir }}/certs/ca.crt
+        -subj "/C=FR/O=ClearSky/CN=ClearSky Root CA"
+      args:
+        creates: "{{ ca_base_dir }}/certs/ca.crt"
+
+    - name: Generate Certificate Revocation List (PEM)
+      command: >
+        openssl ca -gencrl 
+        -config /etc/ssl/openssl.cnf 
+        -cert {{ ca_base_dir }}/certs/ca.crt 
+        -keyfile {{ ca_base_dir }}/private/ca.key 
+        -out {{ ca_base_dir }}/crl/ca.crl.pem
+      args:
+        creates: "{{ ca_base_dir }}/crl/ca.crl.pem"
+
+    - name: Convert CRL to DER format
+      command: >
+        openssl crl 
+        -inform PEM 
+        -in {{ ca_base_dir }}/crl/ca.crl.pem 
+        -out {{ ca_base_dir }}/crl/ca.crl 
+        -outform DER
+      args:
+        creates: "{{ ca_base_dir }}/crl/ca.crl"
+
+    - name: Generate Sub CA private key
+      command: openssl genrsa -out {{ ca_base_dir }}/private/subca.key 2048
+      args:
+        creates: "{{ ca_base_dir }}/private/subca.key"
+
+    - name: Set permissions on Sub CA private key
+      file:
+        path: "{{ ca_base_dir }}/private/subca.key"
+        mode: '0600'
+
+    - name: Generate Sub CA certificate signing request
+      command: >
+        openssl req -new -nodes 
+        -key {{ ca_base_dir }}/private/subca.key 
+        -out {{ ca_base_dir }}/subca.csr
+        -subj "/C=FR/O=ClearSky/CN=ClearSky Sub CA"
+      args:
+        creates: "{{ ca_base_dir }}/subca.csr"
+
+    - name: Sign Sub CA certificate with Root CA
+      command: >
+        openssl ca -batch
+        -config /etc/ssl/openssl.cnf 
+        -extensions v3_intermediate_ca 
+        -policy policy_anything 
+        -in {{ ca_base_dir }}/subca.csr 
+        -out {{ ca_base_dir }}/certs/subca.crt
+      args:
+        creates: "{{ ca_base_dir }}/certs/subca.crt"
+
+    - name: Create extension file for web certificate
+      copy:
+        dest: "{{ ca_base_dir }}/web.ext"
+        content: |
+          [ req_ext ]
+          subjectAltName=DNS:www.dmz.worldskills.org
+
+    - name: Generate web server private key
+      command: openssl genrsa -out {{ ca_base_dir }}/private/web.key 2048
+      args:
+        creates: "{{ ca_base_dir }}/private/web.key"
+
+    - name: Set permissions on web server private key
+      file:
+        path: "{{ ca_base_dir }}/private/web.key"
+        mode: '0600'
+
+    - name: Generate web server certificate signing request
+      command: >
+        openssl req -new -nodes 
+        -key {{ ca_base_dir }}/private/web.key 
+        -out {{ ca_base_dir }}/web.csr
+        -subj "/C=FR/O=ClearSky/CN=www.dmz.worldskills.org"
+      args:
+        creates: "{{ ca_base_dir }}/web.csr"
+
+    - name: Sign web server certificate with Root CA
+      command: >
+        openssl x509 -req 
+        -in {{ ca_base_dir }}/web.csr 
+        -out {{ ca_base_dir }}/certs/web.crt 
+        -CA {{ ca_base_dir }}/certs/ca.crt 
+        -CAkey {{ ca_base_dir }}/private/ca.key 
+        -CAcreateserial 
+        -sha256 
+        -days 3650 
+        -extensions req_ext 
+        -extfile {{ ca_base_dir }}/web.ext
+      args:
+        creates: "{{ ca_base_dir }}/certs/web.crt"
+
+    - name: Create extension file for mail certificate
+      copy:
+        dest: "{{ ca_base_dir }}/mail.ext"
+        content: |
+          [ req_ext ]
+          subjectAltName=DNS:mail.dmz.worldskills.org
+
+    - name: Generate mail server private key
+      command: openssl genrsa -out {{ ca_base_dir }}/private/mail.key 2048
+      args:
+        creates: "{{ ca_base_dir }}/private/mail.key"
+
+    - name: Set permissions on mail server private key
+      file:
+        path: "{{ ca_base_dir }}/private/mail.key"
+        mode: '0600'
+
+    - name: Generate mail server certificate signing request
+      command: >
+        openssl req -new -nodes 
+        -key {{ ca_base_dir }}/private/mail.key 
+        -out {{ ca_base_dir }}/mail.csr
+        -subj "/C=FR/O=ClearSky/CN=mail.dmz.worldskills.org"
+      args:
+        creates: "{{ ca_base_dir }}/mail.csr"
+
+    - name: Sign mail server certificate with Root CA
+      command: >
+        openssl x509 -req 
+        -in {{ ca_base_dir }}/mail.csr 
+        -out {{ ca_base_dir }}/certs/mail.crt 
+        -CA {{ ca_base_dir }}/certs/ca.crt 
+        -CAkey {{ ca_base_dir }}/private/ca.key 
+        -CAcreateserial 
+        -sha256 
+        -days 3650 
+        -extensions req_ext 
+        -extfile {{ ca_base_dir }}/mail.ext
+      args:
+        creates: "{{ ca_base_dir }}/certs/mail.crt"
+
+    - name: Copy certificates to grading directory
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        remote_src: yes
+      loop:
+        - { src: "{{ ca_base_dir }}/certs/ca.crt", dest: "{{ grading_dir }}/ca.pem" }
+        - { src: "{{ ca_base_dir }}/certs/mail.crt", dest: "{{ grading_dir }}/mail.pem" }
+        - { src: "{{ ca_base_dir }}/certs/web.crt", dest: "{{ grading_dir }}/web.pem" }
+        - { src: "{{ ca_base_dir }}/certs/subca.crt", dest: "{{ grading_dir }}/services.pem" }

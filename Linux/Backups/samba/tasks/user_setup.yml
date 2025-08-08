@@ -1,0 +1,30 @@
+---
+- name: Create user directory
+  file:
+    path: /home/samba/{{ samba_user }}
+    state: directory
+    owner: "{{ samba_user }}"
+    group: "{{ samba_user }}"
+    mode: '0755'
+
+- name: Add system user
+  user:
+    name: "{{ samba_user }}"
+    password: "{{ samba_password | password_hash('sha512') }}"
+    shell: /bin/bash
+    home: /home/samba/{{ samba_user }}
+    create_home: yes
+
+- name: Add user to sambashare group
+  user:
+    name: "{{ samba_user }}"
+    groups: sambashare
+    append: yes
+
+- name: Add Samba user
+  expect:
+    command: smbpasswd -a {{ samba_user }}
+    responses:
+      (?i)New SMB password: "{{ samba_password }}"
+      (?i)Retype new SMB password: "{{ samba_password }}"
+  when: samba_password is defined
